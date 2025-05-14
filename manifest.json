@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "Swedbank Mock Redirect",
+  "version": "1.0",
+  "description": "Redirects to highest Mock-enabled TDE environment",
+  "permissions": [
+    "tabs",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://applink.swedbank.net/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_icon": "icon.png"
+  },
+  "icons": {
+    "48": "icon.png"
+  }
+}
