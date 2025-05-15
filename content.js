@@ -1,51 +1,40 @@
 (async () => {
-    const waitForDomReady = () => new Promise(resolve => {
-        if (document.readyState === "interactive" || document.readyState === "complete") return resolve();
-        document.addEventListener("DOMContentLoaded", resolve);
-        setTimeout(resolve, 5000);
-    });
+    const domReady = () =>
+        new Promise(resolve => {
+            if (document.readyState !== "loading") return resolve();
+            document.addEventListener("DOMContentLoaded", resolve, {once: true});
+            setTimeout(resolve, 5000);
+        });
 
-    await waitForDomReady();
+    await domReady();
 
     const panels = document.querySelectorAll('.rel-info-panel');
-    let maxVersion = -Infinity;
-    let targetUrl = "";
-    let versionStr = "";
-    let hostInfo = "";
+    let best = null;
 
-    panels.forEach(panel => {
+    for (const panel of panels) {
         const headerText = panel.querySelector('.panel-heading-rel')?.innerText || '';
-        const bodyDivs = panel.querySelectorAll('.panel-body .medium-font-text');
-        const bodyLines = Array.from(bodyDivs).map(div => div.innerText);
-        const mockLine = bodyLines.find(line => line.includes("Mock is enabled"));
+        const bodyTexts = Array.from(panel.querySelectorAll('.panel-body .medium-font-text')).map(div => div.innerText);
+        const mockLine = bodyTexts.find(text => text.includes("Mock is enabled"));
+        if (!mockLine) continue;
 
-        if (mockLine) {
-            const match = headerText.match(/R?(\d+(\.\d+)?)/i);
-            if (match) {
-                const num = parseFloat(match[1]);
-                if (num > maxVersion) {
-                    maxVersion = num;
-                    versionStr = match[0]; // e.g. "R224"
+        const versionMatch = headerText.match(/R?(\d+(?:\.\d+)?)/i);
+        const idMatch = mockLine.match(/lx(\d+):S(\d+)/i);
+        if (!versionMatch || !idMatch) continue;
 
-                    const idMatch = mockLine.match(/lx(\d+):S(\d+)/i);
-                    if (idMatch) {
-                        const host = idMatch[1];
-                        const slot = idMatch[2];
-                        hostInfo = `lx${host}:S${slot}`;
-                        targetUrl = `https://ib${host}.s${slot}.tde.swedbank.net/app/ib/logga-in`;
-                    }
-                }
-            }
+        const versionNum = parseFloat(versionMatch[1]);
+        if (!best || versionNum > best.version) {
+            best = {
+                version: versionNum,
+                versionStr: versionMatch[0],
+                hostInfo: `lx${idMatch[1]}:S${idMatch[2]}`,
+                url: `https://ib${idMatch[1]}.s${idMatch[2]}.tde.swedbank.net/app/ib/logga-in`
+            };
         }
-    });
-
-    if (targetUrl) {
-        chrome.runtime.sendMessage({
-            redirectTo: targetUrl,
-            version: versionStr,
-            host: hostInfo
-        });
-    } else {
-        chrome.runtime.sendMessage({ error: "No Mock enabled env found" });
     }
+
+    chrome.runtime.sendMessage(
+        best
+            ? {redirectTo: best.url, version: best.versionStr, host: best.hostInfo}
+            : {error: "No Mock enabled env found"}
+    );
 })();
